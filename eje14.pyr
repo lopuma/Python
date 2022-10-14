@@ -1,0 +1,290 @@
+# encoding: utf-8
+
+'''
+####### Python 3 #######
+import tkinter as tk
+import tkinter.font as tkFont
+'''
+''''''
+####### Python 2 #######
+import Tkinter as tk
+import tkFont  
+
+entr_str = tk.Entry()
+
+def beep_error(f):
+    '''
+    Decorador que permite emitir un beep cuando un método de instancia
+    decorado de un widget produce una excepción
+    '''
+    def applicator(*args, **kwargs):
+        try:
+            f(*args, **kwargs)
+        except:
+            if args and isinstance(args[0], tk.Widget):
+                args[0].bell()
+    return applicator
+
+
+class MyText(tk.Text):
+    def __init__(self, parent=None, *args, **kwargs):
+        tk.Text.__init__(self, parent, *args, **kwargs)
+        self.parent = parent
+        self.bind('<Control-a>', self.seleccionar_todo)
+        self.bind('<Control-x>', self.cortar)
+        self.bind('<Control-c>', self.copiar)
+        self.bind('<Control-v>', self.pegar)
+        self.bind('<Control-z>', self.deshacer)
+        self.bind('<Control-Shift-z>', self.rehacer)
+        self.bind("<Button-3><ButtonRelease-3>", self.mostrar_menu)
+        # Para las búsquedas...
+        #    -> Buscar todas las ocurrencias
+        self.bind('<Control-Shift-f>', self.buscar_todo)
+        #    -> Buscar la primera ocurrencia
+        self.bind('<Control-f>', self.buscar(True, False))
+        #    -> Buscar la siguiente ocurrencia
+        self.bind('<F3>', self.buscar(False, False))
+        #    -> Buscar la anterior ocurrencia
+        self.bind('<Shift-F3>', self.buscar(False, True))
+
+
+        # Para Búsqueda simple | Anterior | Siguiente
+        self.idx_prev = tk.StringVar()
+        self.idx_next = tk.StringVar()
+        self.idx_next.set('1.0')
+
+    def mostrar_menu(self, event):
+        '''
+        Muestra un menú popup con las opciones copiar, pegar y cortar
+        al hacer click derecho en el Text
+        '''
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Cortar", command=self.cortar)
+        menu.add_command(label="Copiar", command=self.copiar)
+        menu.add_command(label="Pegar", command=self.pegar)
+        menu.add_separator()
+        menu.add_command(label="Buscar tod@s", command=self.buscar_todo)
+        menu.add_command(label="Buscar...", command=lambda: self.buscar(True, False))
+        menu.add_command(label="Buscar Siguiente", command=lambda: self.buscar(False, False))
+        menu.add_command(label="Buscar Anterior", command=lambda: self.buscar(False, True))
+        menu.tk.call("tk_popup", menu, event.x_root, event.y_root)
+
+    def copiar(self, event=None):
+        self.event_generate("<<Copy>>")
+        self.see("insert")
+        return 'break'
+
+    def cortar(self, event=None):
+        self.event_generate("<<Cut>>")
+        return 'break'
+
+    def pegar(self, event=None):
+        self.event_generate("<<Paste>>")
+        self.see("insert")
+        return 'break'
+
+    def seleccionar_todo(self, event=None):
+        self.tag_add('sel', '1.0', 'end')
+        return 'break'
+
+    @beep_error
+    def deshacer(self, event=None):
+        self.tk.call(self, 'edit', 'undo')
+        return 'break'
+
+    @beep_error
+    def rehacer(self, event=None):
+        self.tk.call(self, 'edit', 'redo')
+        return 'break'
+
+
+    '''
+    ¿Cómo accedería al ENTRY desde las dos siguientes funciones si estuviera como
+    self.entr_str dentro de MainApp.buscar y no como global " en_str = '' " arriba
+    del archivo?
+    '''
+    # ¿¿Hace falta poner en este método también lo de "event=none"??
+    def buscar_todo(self, event=None):
+        '''Buscar todas las ocurrencias en el Entry de MainApp'''
+        global entr_str
+
+        # eliminar el tag 'found', si existiera
+        self.tag_remove('found', '1.0', tk.END)
+        # obtener la cadena a buscar (no buscar estando vacía)
+        s = entr_str.get()
+        if s:
+            # empezar desde el principio (y parar al llegar al final [stopindex >> END])
+            idx = '1.0'
+            while 1:
+                # encontrar siguiente ocurrencia, salir del loop si no hay más
+                idx = self.search(s, idx, nocase=1, stopindex=tk.END)
+                if not idx: break
+                # index justo después del final de la ocurrencia
+                lastidx = '%s+%dc' % (idx, len(s))
+                # etiquetando toda la ocurrencia (incluyendo el start, excluyendo el stop)
+                self.tag_add('found', idx, lastidx)
+                # preparar para buscar la siguiente ocurrencia
+                idx = lastidx
+            # poner de color rojo la fuente de las ocurrencias etiquetadas
+            self.tag_config('found', foreground='red')
+        # dando el foco al campo de entrada de texto
+        entr_str.focus_set()
+
+    def buscar(self, f_ini=True, _backward=False, event=None):
+        '''Buscar ocurrencia en el Entry de MainApp'''
+        global entr_str
+
+        # eliminar el tag 'found', si existiera
+        self.tag_remove('found', '1.0', tk.END)
+        # obtener la cadena a buscar (no buscar estando vacía)
+        s = entr_str.get()
+        if s:
+            # empezar desde el principio (y parar al llegar al final [stopindex >> END])
+            if f_ini:
+                self.idx_next.set('1.0')
+            #print('- idx_next >> {}'.format(self.idx_next.get()))
+
+            # # encontrar siguiente ocurrencia
+            if(_backward == False):
+                idx = self.search(s, self.idx_next.get(), nocase=1)
+            else:
+                idx = self.search(s, self.idx_prev.get(), nocase=1, backwards=True)
+            # index justo después del final de la ocurrencia
+            lastidx = '%s+%dc' % (idx, len(s))
+            # etiquetando toda la ocurrencia (incluyendo el start, excluyendo el stop)
+            self.tag_add('found', idx, lastidx)
+            # preparar para buscar la anterior ocurrencia
+            self.idx_prev.set(self.idx_next)
+            # preparar para buscar la siguiente ocurrencia
+            self.idx_next.set(lastidx)
+
+            # poner de color rojo la fuente de las ocurrencias etiquetadas
+            self.tag_config('found', foreground='red')
+        # dando el foco al campo de entrada de texto
+        entr_str.focus_set()
+
+
+
+class MainApp(tk.Tk):
+    def __init__(self, *args, **kwargs):
+        tk.Tk.__init__(self, *args, **kwargs)
+
+        menubar = tk.Menu(self, bg='black', fg='white')
+        self.config(menu=menubar)
+
+        editmenu = tk.Menu(menubar, tearoff=0, bg='black', fg='white')
+        menubar.add_cascade(label='Editar', menu=editmenu, underline=0)
+
+        findmenu = tk.Menu(menubar, tearoff=0, bg='black', fg='white')
+        menubar.add_cascade(label='Buscar', menu=findmenu, underline=0)
+
+
+        frame = tk.Frame(self, bg='black')
+        frame.pack(fill='both', expand=1)
+        frame.config(padx=10, pady=10)
+
+        frame_txt = tk.Frame(frame, background='black')
+        frame_txt.grid(row=1, column=0, padx=5, pady=5, sticky=tk.W+tk.E)
+
+        self.text_font = tkFont.Font(family='Consolas', size=12)
+        self.text_01 = MyText(frame_txt, wrap=tk.WORD, bd=0, undo=True)
+        self.text_01.pack(fill='both', expand=1)
+        self.text_01.config(bd=0, padx=6, pady=4, font=self.text_font,
+                            selectbackground='lightblue',
+                            width=44, height=16,
+                            bg='#242424', fg='white',
+                            insertbackground='white',
+                            highlightbackground='black',
+                            highlightcolor='white'
+                            )
+
+        editmenu.add_command(label='Deshacer',
+                            command=self.text_01.deshacer,
+                            accelerator='Ctrl+Z'
+                            )
+        editmenu.add_command(label='Rehacer',
+                            command=self.text_01.rehacer,
+                            accelerator='Ctrl+Shift+Z'
+                            )
+        editmenu.add_separator()
+        editmenu.add_command(label='Cortar',
+                            command=self.text_01.cortar,
+                            accelerator='Ctrl+X'
+                            )
+        editmenu.add_command(label='Copiar',
+                            command=self.text_01.copiar,
+                            accelerator='Ctrl+C'
+                            )
+        editmenu.add_command(label='Pegar',
+                            command=self.text_01.pegar,
+                            accelerator='Ctrl+V'
+                            )
+        editmenu.add_command(label='Seleccionar todo',
+                            command=self.text_01.seleccionar_todo,
+                            accelerator='Ctrl+A'
+                            )
+
+        findmenu.add_command(label='Buscar',
+                            command=lambda: self.buscar('Simple'),
+                            accelerator='Ctrl+F'
+                            )
+        findmenu.add_command(label='Buscar todo',
+                            command=lambda: self.buscar('All'),
+                            accelerator='Ctrl+Shift+F'
+                            )
+
+        # Cargando un texto de prueba
+        text_01_contenido = '''Esto es un contenido de prueba para buscar cualquier texto.
+
+        Unas cuántas palabras que forman frases y párrafos en los que buscar concurrencias referidas a los términos buscados.'''
+        self.text_01.insert(1.0, text_01_contenido)
+
+
+    def buscar(self, tipo='Simple'):
+
+        busca_top_w = 350
+        busca_top_h = 80
+        busca_top_x = (self.winfo_screenwidth() / 2) - (busca_top_w / 2)
+        busca_top_y = (self.winfo_screenheight() / 2) - (busca_top_h / 2)
+
+        busca_top = tk.Toplevel(self)
+        busca_top.geometry('{}x{}+{}+{}'.format(busca_top_w, busca_top_h, busca_top_x, busca_top_y))
+        busca_top.config(bg='white', padx=5, pady=5)
+        busca_top.resizable(0,0)
+
+        self.busca_frm_tit = tk.Frame(busca_top, bg='grey', pady=5)
+        self.busca_frm_tit.pack(fill='x', expand=1)
+
+        # ¿¿Cómo centrar este Frame o su contenido??
+        self.busca_frm_content = tk.Frame(busca_top, bg='grey', padx=5, pady=5)
+        self.busca_frm_content.pack(fill='x', expand=1)
+
+        if(tipo == 'Simple'):
+            busca_top.title('Buscar...')
+            buscar_01_txt = '~ Buscar ~'
+        elif(tipo == 'All'):
+            busca_top.title('Buscar tod@s...')
+            buscar_01_txt = '~ Buscar tod@s ~'
+
+        buscar_01_msg = tk.Message(self.busca_frm_tit, text=buscar_01_txt, bg='grey', padx=10, pady=0)
+        buscar_01_msg.pack(fill='both', expand=1)
+        buscar_01_msg.config(width=240, justify='center', font=('Consolas', 14, 'bold'))
+
+        entr_str = tk.Entry(self.busca_frm_content)
+        entr_str.grid(row=0, column=0)
+
+        if(tipo == 'Simple'):
+            self.btn_buscar = tk.Button(self.busca_frm_content, text='Buscar', command=lambda: self.text_01.buscar(True, False))
+            self.btn_buscar.grid(row=0, column=1)
+            self.btn_buscar_prev = tk.Button(self.busca_frm_content, text='<|', command=lambda: self.text_01.buscar(False, True))
+            self.btn_buscar_prev.grid(row=0, column=2)
+            self.btn_buscar_next = tk.Button(self.busca_frm_content, text='|>', command=lambda: self.text_01.buscar(False, False))
+            self.btn_buscar_next.grid(row=0, column=3)
+        elif(tipo == 'All'):
+            self.btn_buscar = tk.Button(self.busca_frm_content, text='Buscar tod@s', command=self.text_01.buscar_todo)
+            self.btn_buscar.grid(row=0, column=1)
+
+
+
+if __name__ == "__main__":
+    MainApp().mainloop()
