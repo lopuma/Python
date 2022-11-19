@@ -1,0 +1,4 @@
+clear
+echo "date;hostname;lslpp -l bos.mp64"
+date;hostname;lslpp -l bos.mp64
+exit

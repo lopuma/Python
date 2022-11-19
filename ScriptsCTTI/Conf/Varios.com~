@@ -1,0 +1,4 @@
+clear
+echo "date;hostname;lslpp -l | egrep -i <bos.net.tcp.client|Java|openssl>;hostname"
+date;hostname;lslpp -l | egrep -i "bos.net.tcp.client|Java|openssl";hostname
+exit

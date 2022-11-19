@@ -1,0 +1,6 @@
+clear
+sudosas -i
+echo "date;hostname;oslevel -s"
+date;hostname;oslevel -s
+exit
+exit

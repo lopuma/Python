@@ -1,0 +1,4 @@
+clear
+echo "date;hostname;lslpp -L openssh.base.client openssh.base.server;emgr -l -L IV80743m9a"
+date;hostname;lslpp -L openssh.base.client openssh.base.server;emgr -l -L IV80743m9a
+exit

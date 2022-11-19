@@ -1,0 +1,2 @@
+echo "date;hostname;cat /etc/*release;uname -a;rpm -qa --last"
+date;hostname;cat /etc/*release;uname -a;rpm -qa --last

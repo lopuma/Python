@@ -1,0 +1,6 @@
+clear
+sudosas -i
+echo "date;hostname;lslpp -L openssl.base;emgr -l -L 101a_fix"
+date;hostname;lslpp -L openssl.base;emgr -l -L 101a_fix
+exit
+exit

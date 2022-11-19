@@ -1,0 +1,4 @@
+clear
+echo "date;hostname;oslevel -s;lslpp -L | grep -i sysmgt.pconsole.rte"
+date;hostname;oslevel -s;lslpp -L | grep -i sysmgt.pconsole.rte
+exit

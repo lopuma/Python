@@ -1,0 +1,2 @@
+date;hostname;oslevel -s;lslpp -L | grep -i bos.rte.control
+exit

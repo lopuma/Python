@@ -1,0 +1,4 @@
+clear
+echo "date;hostname;lslpp -L bos.rte.libc"
+date;hostname;lslpp -L bos.rte.libc
+exit

@@ -1,0 +1,7 @@
+clear
+echo "date;hostname;oslevel -s;uname -a;lslpp -l | grep -i bos.net.tcp.client;lslpp -l | grep -i ntp.rte"
+date;hostname;oslevel -s;uname -a
+lslpp -l | grep -i bos.net.tcp.client
+lslpp -l | grep -i ntp.rte
+exit
+

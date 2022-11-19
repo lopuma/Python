@@ -1,0 +1,11 @@
+clear
+sudosas su -
+echo "date;hostname;oslevel -s;uname -a"
+echo "cat /etc/sudoers | grep Defaults!"
+echo "cat /etc/sudoers | grep Cmnd_Alias"
+date;hostname;oslevel -s;uname -a
+cat /etc/sudoers | grep Defaults!
+cat /etc/sudoers | grep Cmnd_Alias
+exit
+exit
+

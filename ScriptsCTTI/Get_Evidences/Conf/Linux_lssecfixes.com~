@@ -1,0 +1,2 @@
+echo "date;hostname;cat /etc/*release;uname -a;/home/ESS01012/lssecfixes"
+date;hostname;cat /etc/*release;uname -a;/home/ESS01012/lssecfixes

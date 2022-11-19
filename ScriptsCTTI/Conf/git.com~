@@ -1,0 +1,4 @@
+clear
+echo "date;hostname;lslpp -l | grep -i Java"
+date;hostname;lslpp -l | grep -i Java
+exit

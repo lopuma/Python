@@ -1,0 +1,4 @@
+clear
+echo "date;hostname;lslpp -l | grep -i openssl"
+date;hostname;lslpp -l | grep -i openssl
+exit

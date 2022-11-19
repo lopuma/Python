@@ -1,0 +1,1 @@
+date;hostname;oslevel -s;lslpp -L | grep -i bos.mp64

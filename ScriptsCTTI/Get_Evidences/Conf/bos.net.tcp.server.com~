@@ -1,0 +1,9 @@
+echo "prueba"
+y
+echo "post yes"
+clear
+echo "post clear"
+echo "date;hostname;oslevel -s;lslpp -L bos.net.tcp.server;hostname"
+date;hostname;oslevel -s;lslpp -L bos.net.tcp.server;hostname
+echo "exit"
+exit

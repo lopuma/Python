@@ -1,0 +1,2 @@
+date;hostname;oslevel -s;lslpp -l | grep -i openssh
+exit

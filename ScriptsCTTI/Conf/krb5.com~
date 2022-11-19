@@ -1,0 +1,4 @@
+clear
+echo "date;hostname;lslpp -L krb5.client.rte krb5.server.rte"
+date;hostname;lslpp -L krb5.client.rte krb5.server.rte
+exit

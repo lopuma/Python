@@ -1,0 +1,4 @@
+clear
+echo "date;hostname;oslevel -s;lslpp -L bos.rte.lvm"
+date;hostname;oslevel -s;lslpp -L lslpp -L bos.rte.lvm
+exit

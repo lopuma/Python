@@ -1,0 +1,2 @@
+echo "date;hostname;oslevel -s;lslpp -L | egrep -i "cluster.es.client.rte|cluster.es.cspoc.cmds|cluster.es.cspoc.rte""
+date;hostname;oslevel -s;lslpp -L | egrep -i "cluster.es.client.rte|cluster.es.cspoc.cmds|cluster.es.cspoc.rte"

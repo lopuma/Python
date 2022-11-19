@@ -1,0 +1,4 @@
+sudosas -i
+date;hostname;oslevel -s;lslpp -L | grep -i openssl.base;emgr -l
+exit
+exit

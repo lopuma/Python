@@ -1,0 +1,5 @@
+sudosas -i
+echo "date;hostname;tail -5 /etc/mail/sendmail.cf"
+date;hostname;tail -5 /etc/mail/sendmail.cf
+exit
+exit

@@ -1,0 +1,3 @@
+echo "date;hostname;cat /etc/*release;uname -a;ssh -V"
+ssh -V;
+date;hostname;cat /etc/*release;uname -a;ssh -V;hostname;

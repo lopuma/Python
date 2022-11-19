@@ -1,0 +1,4 @@
+clear
+echo "date;cat /etc/*release;uname -a;hostname"
+date;hostname;cat /etc/*release;uname -a
+exit

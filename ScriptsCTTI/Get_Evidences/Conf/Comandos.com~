@@ -1,0 +1,7 @@
+clear
+echo "date;hostname;oslevel -s;uname -a;lslpp -l | grep -i bos.mp64"
+date;hostname;oslevel -s;uname -a;lslpp -l | grep -i bos.mp64
+sudosas su -
+cat /etc/sudoers
+exit
+exit

@@ -1,0 +1,2 @@
+date;hostname;cat /etc/*release;uname -a
+exit

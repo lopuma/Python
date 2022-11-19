@@ -1,0 +1,2 @@
+echo "date;hostname;oslevel -s;lslpp -L | egrep -i "bos.net.tcp.client|bos.net.tcp.server";emgr -P"
+date;hostname;oslevel -s;lslpp -L | egrep -i "bos.net.tcp.client|bos.net.tcp.server";emgr -P

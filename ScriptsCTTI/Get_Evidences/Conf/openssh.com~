@@ -1,0 +1,5 @@
+clear
+echo "date;hostname;oslevel -s;uname -a;lslpp -l | grep -i openssl"
+date;hostname;oslevel -s;uname -a;lslpp -l | grep -i openssl
+exit
+

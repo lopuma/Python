@@ -1,0 +1,2 @@
+echo "date;hostname;cat /etc/*release;uname -a;---lssecfixes -n"
+date;hostname;cat /etc/*release;uname -a;/home/ess01012/GetEvidence_con_passwd/conf/lssecfixes/lssecfixes -n

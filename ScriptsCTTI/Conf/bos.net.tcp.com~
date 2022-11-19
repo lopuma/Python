@@ -1,0 +1,6 @@
+clear
+sudosas -i
+echo "date;hostname;oslevel -s;lslpp -L bos.net.tcp.client bos.net.tcp.server bos.net.tcp.imapd bos.net.tcp.pop3d bos.net.tcp.sendmail;emgr -P"
+date;hostname;oslevel -s;lslpp -L bos.net.tcp.client bos.net.tcp.server bos.net.tcp.imapd bos.net.tcp.pop3d bos.net.tcp.sendmail;emgr -P
+exit
+exit

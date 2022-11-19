@@ -1,0 +1,2 @@
+echo "date;hostname;update;cat /etc/*release;uname -a;rpm -qa --last|sort"
+date;hostname;uptime;cat /etc/*release;uname -a;rpm -qa --last|sort

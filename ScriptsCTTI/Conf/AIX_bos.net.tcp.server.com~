@@ -1,0 +1,3 @@
+clear
+date;hostname;oslevel -s;lslpp -L | grep -i bos.net.tcp.server
+exit

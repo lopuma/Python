@@ -1,0 +1,4 @@
+clear
+echo "date;hostname;oslevel -s;lslpp -L bos.net.tcp.client bos.net.tcp.server;hostname"
+date;hostname;oslevel -s;lslpp -L bos.net.tcp.client bos.net.tcp.server;hostname
+exit
