@@ -1,0 +1,6 @@
+argparse
+selenium
+pandas
+requests
+tqdm
+termcolor
