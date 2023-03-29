@@ -4,7 +4,7 @@ FROM python:3.10
 WORKDIR /app
 
 # Copia el archivo `requirements.txt` a tu imagen
-COPY requirements.txt .
+COPY ./conf/requirements.txt .
 
 # Instala las dependencias de tu aplicación
 RUN pip install --no-cache-dir -r requirements.txt
@@ -21,4 +21,4 @@ COPY . .
 #     apt-get install -y docker-ce-cli
 
 # Define el comando para ejecutar tu script
-ENTRYPOINT ["python", "lbctl.py"]
+ENTRYPOINT ["python", "/app/src/lbctl.py"]
