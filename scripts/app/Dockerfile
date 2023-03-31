@@ -6,8 +6,12 @@ WORKDIR /app
 # Copia el archivo `requirements.txt` a tu imagen
 COPY ./conf/requirements.txt .
 
+RUN python -m pip install --upgrade pip
+
 # Instala las dependencias de tu aplicación
 RUN pip install --no-cache-dir -r requirements.txt
+
+RUN mkdir -p ./covers
 
 # Copia todo el código de tu aplicación a la imagen
 COPY . .

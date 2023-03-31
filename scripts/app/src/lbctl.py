@@ -3,7 +3,16 @@ import subprocess
 import sys
 import json
 import pandas as pd
+import time
+import redis
+import urllib.request
 from pathlib import Path
+import os
+import random
+import mysql_connection
+from minio import Minio
+from minio.error import S3Error
+from PIL import Image
 from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -11,14 +20,10 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.common.alert import Alert
-import time
 from tqdm import tqdm, trange
 from selenium.common.exceptions import NoSuchElementException, TimeoutException, ElementClickInterceptedException
 from termcolor import colored
 from decouple import config
-import mysql_connection
-cnx = mysql_connection.mydb
-cursor = cnx.cursor()
 
 color_out = "green"
 color_key = "yellow"
@@ -26,7 +31,7 @@ color_value = "blue"
 color_analizando = "yellow"
 color_error = "red"
 color_warning = "yellow"
-
+color_success = "green"
 def main():
     options = webdriver.FirefoxOptions()
     options.add_argument('--start-maximized')
@@ -93,135 +98,350 @@ def capitalizar_palabras(cadena, excepciones=["de"]):
         palabras_mayusculas.append(palabra)
     return ' '.join(palabras_mayusculas)
 
-def conection_database(data):
-    try:
-        title = data[0]['title']
-        print("RECIVO title => ", title)
-    except (IndexError, KeyError):
-        print("Error al acceder al title en los datos recibidos.")
-    try:
-        author = data[0]['author']
-        print("RECIVO author => ", author)
-    except (IndexError, KeyError):
-        print("Error al acceder al author en los datos recibidos.")
-    try:
-        editorial = data[0]['editorial']
-        print("RECIVO editorial => ", editorial)
-    except (IndexError, KeyError):
-        print("Error al acceder al editorial en los datos recibidos.")
-    try:
-        isbn = data[0]['isbn']
-        print("RECIVO ISBN => ", isbn)
-    except (IndexError, KeyError):
-        print("Error al acceder al ISBN en los datos recibidos.")
-    try:
-        type = data[0]['category']
-        print("RECIVO type => ", type)
-    except (IndexError, KeyError):
-        print("Error al acceder al type en los datos recibidos.")
-    try:
-        language = data[0]['language']
-        print("RECIVO language => ", language)
-    except (IndexError, KeyError):
-        print("Error al acceder al language en los datos recibidos.")
+def generate_cover_rand(length, type='default'):
+    if type == 'num':
+        characters = "0123456789"
+    elif type == 'alf':
+        characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    elif type == 'rand':
+        characters = None
+    else:
+        characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+    rand_name_cover = ""
+    for i in range(length):
+        if type == 'rand':
+            rand_name_cover += chr(random.randint(33, 126))
+        else:
+            rand_name_cover += random.choice(characters)
+    return rand_name_cover
+
+def process_image(data_cover):
+    # Descargar la imagen
+    url = data_cover
+    name_cover = generate_cover_rand(15)
+    pictures_dir = './covers/'
+    urllib.request.urlretrieve(url, pictures_dir + name_cover + '.png')
     
-    with tqdm(total=100, desc="\033[33mRealizando operaciones en la Base de datos....\033[0m") as pbar:
-        # al final del ciclo for, puedes imprimir el mensaje de conexión
-        print("\033[32mConectado a la base de datos.\033[0m")
-        pbar.update(50)
+    # Abrir la imagen con Pillow
+    with Image.open(pictures_dir + name_cover + '.png') as img:
+        # Redimensionar la imagen y ajustar los parámetros de ajuste
+        img = img.resize((200, 322), resample=Image.LANCZOS, box=None, reducing_gap=None)
+        img = img.convert('RGB') # Convertir la imagen a modo RGB
+        
+        # Guardar la imagen redimensionada
+        img.save(pictures_dir + name_cover + '.png', format='PNG', optimize=True)
+    
+    return name_cover
 
-        query = "SELECT * FROM users"
-        cursor.execute(query)
-        pbar.update(50)        
-    # with tqdm(total=10, desc="\033[33mGuardando datos....\033[0m") as pbar:
-    #     try:
-    #         add_book = ("INSERT INTO books "
-    #                     "(title, author, editorial, isbn, type, language) "
-    #                     "VALUES (%s, %s, %s, %s, %s, %s)")
-    #         data_book = (title, author, editorial, isbn, type, language)
+def add_minio(name_cover):
+    filename = name_cover + ".png"
+    try:
+        client = Minio(
+        endpoint=config("MINIO_HOST"),
+        access_key=config("MINIO_USER"),
+        secret_key=config("MINIO_PASSWORD"),
+        secure= False,
+        )
+        bucket = config("BUCKET_NAME")
+        found = client.bucket_exists(bucket)
+        if not found:
+            client.make_bucket(bucket)
+        else:
+            print("\n")
+            print(f"Bucket {bucket} already exists")
+        client.fput_object(
+            bucket, filename, os.path.join(".", "covers", filename),
+        )
+        print("\n")
+        print(colored("Cover Data upload MINIO =>.", color_success), filename)
+    except S3Error as exc:
+        print("\nerror occurred.", exc)
 
-    #         cursor.execute(add_book, data_book)
-    #         cnx.commit()
-    #     except Exception as e:
-    #         print("Error al guardar los datos:", e)
-    #         cnx.rollback()
-    #     finally:
-    #         cursor.close()
-    #         cnx.close()
+def delete_redis():
+    try:
+        r = redis.Redis(host=config("REDIS_HOST"), port=6379, password=config("REDIS_PASSWORD"))
+        exist_book = r.exists('books')
+        if exist_book:
+            r.delete('books')
+        print("\n")
+        print(colored(f"Eliminados datos en redis.", color_success))
+        yield
+    except:
+        pass
 
-    #     pbar.update(10)
+def delete_bookinfo_redis(idBook):
+    try:
+        bookID = idBook
+        r = redis.Redis(host=config("REDIS_HOST"), port=6379, password=config("REDIS_PASSWORD"))
+        exist_book = r.exists(f'bookInfo{bookID}')
+        if exist_book:
+            r.delete(f'bookInfo{bookID}')
+    except:
+        pass
+
+def extract_nameCover(url):
+    try:
+        url_cover = url
+        name_cover = process_image(url_cover)
+    except (IndexError, KeyError):
+        name_cover = None
+    return name_cover
+                
+def extract_data(data):
+    datos = {}
+    try:
+        datos['title'] = data[0]['title']
+    except (IndexError, KeyError):
+        print(colored("Error al acceder al title en los datos recibidos.", color_error))
+    try:
+        datos['author'] = data[0]['author']
+    except (IndexError, KeyError):
+        print(colored("Error al acceder al author en los datos recibidos.", color_error))
+    try:
+        datos['editorial'] = data[0]['editorial']
+    except (IndexError, KeyError):
+        print(colored("Error al acceder al editorial en los datos recibidos.", color_error))
+    try:
+        datos['isbn'] = data[0]['isbn']
+    except (IndexError, KeyError):
+        print(colored("Error al acceder al ISBN en los datos recibidos.", color_error))
+    try:
+        datos['type'] = data[0]['category']
+    except (IndexError, KeyError):
+        print(colored("Error al acceder al type en los datos recibidos.", color_error))
+    try:
+        datos['language'] = data[0]['language']
+    except (IndexError, KeyError):
+        print(colored("Error al acceder al language en los datos recibidos.", color_error))  
+    try:
+        datos['cover'] = data[0]['cover']
+    except (IndexError, KeyError):
+        print(colored("Error al acceder al cover en los datos recibidos.", color_error))   
+    
+    return datos
+
+def connect_database():
+    try:
+        cnx = mysql_connection.mydb
+        if cnx.is_connected():
+            cursor = cnx.cursor()
+    except:
+        pass
+    return (cursor, cnx)
+
+def loop(tareas):
+    while tareas:
+        actual = tareas.pop(0)
+        try:
+            next(actual)
+            tareas.append(actual)
+        except StopIteration:
+            pass
+      
+def select_idBook(book_data, name_cover, cursor):
+    try:
+        select_book = "SELECT bookID FROM books WHERE isbn = %s"
+        data_isbn = (book_data["isbn"],)
+        cursor.execute(select_book, data_isbn)
+        result = cursor.fetchone()
+        if result:
+            return result[0]
+        else:
+            return None
+    except mysql_connection.MySQLConnectionError as e:
+        print("\n", colored("Error de integridad:", "red"), e.msg)
+    except mysql_connection.errors.IntegrityError as e:
+        print("\n", colored("Error de integridad en la base de datos --:", "red"), e.msg)
+
+def insert_nameCover(name_cover, idBook, cursor):
+    try:
+        cover_name = name_cover+'.png'
+        bookID = idBook
+        insert_nameCover = ("INSERT INTO coverBooks "
+                                "(bookID, nameCover) "
+                                "VALUES (%s, %s)")
+        data_nameCover = (bookID, cover_name)
+        cursor.execute(insert_nameCover, data_nameCover)
+    except mysql_connection.MySQLConnectionError as e:
+        print("\n", colored("Error de integridad:", "red"), e.msg)
+    except mysql_connection.errors.IntegrityError as e:
+        print("\n", colored("Error de integridad en la base de datos --:", "red"), e.msg)
+    finally:
+        cursor.close()
+    return True
+
+def handle_duplicate_isbn(response):
+    print(colored("Este libro ya existe en la base de datos", "yellow"), response)
+    print(colored("¿Deseas actualizar su información? (S/N)", "yellow"))
+    answer = input("> ")
+    if answer == "S" or answer == "s":
+        print(colored("¡Genial! Vamos a actualizar su información.", "green"))
+    elif answer == "N" or answer == "n":
+        print(colored("¡Entendido! Saliendo del programa...", "green"))
+        sys.exit()
+    else:
+        print(colored("No seleccionaste una opción válida. Saliendo del programa...", "red"))
+        sys.exit()
+                   
+def data_operation(resultados):
+    data_book =  resultados
+    print("\n")
+    print("\033[33mRealizando operaciones en la Base de datos....\033[0m")
+    with tqdm(total=5) as rbar:
+        # extraer los datos del libro
+        book_data = extract_data(data_book)
+        if book_data:
+            print("\n")
+            print(colored("Datos extraidos con existos.", color_success))
+        time.sleep(0.5)
+        rbar.update(1)
+        yield
+        # extraer el nombre del cover guardado en local
+        name_cover = extract_nameCover(book_data['cover'])
+        if name_cover:
+            print("\n")
+            print(colored(f"Cover {name_cover} descargado con existos.", color_success))        
+        time.sleep(0.5)
+        rbar.update(1)
+        yield
+        
+        # conect mysql
+        cursor, cnx = connect_database()
+        if cursor:
+            print("\n")
+            print(colored(f"The DataBase is connected on the PORT: {config('MYSQL_PORT')}", color_success))
+        time.sleep(0.5)
+        rbar.update(1)
+        yield
+        bookID = ""
+        response = exist_databook(book_data, cursor)
+        if response:
+            rbar.close()
+            handle_duplicate_isbn(response)
+            time.sleep(0.5)
+            rbar.update(1)
+            yield
+        else:
+            succes_data = insert_databook(book_data, cursor)
+            if succes_data:
+                cnx.commit()
+                bookID = select_idBook(book_data, name_cover, cursor)
+                if bookID:
+                    response_namecover = insert_nameCover(name_cover, bookID, cursor)
+                    if response_namecover:
+                        cnx.commit()
+                        print("\n")
+                        print(colored(f"The book data has been added correctly, with ID : {bookID}", color_success))
+                        time.sleep(0.5)
+                        rbar.update(1)
+                else:
+                    rbar.close()
+                    print("\n")
+                    print(colored(f"[ ERROR ], The BOOK with ID : {bookID} does not exist", color_error))
+            yield
+        
+        # delete book Info
+        succes_delete_bookinfo = delete_bookinfo_redis(bookID)
+        if succes_delete_bookinfo:
+            print("\n")
+            print(colored(f"Eliminados datos en redis del book ID {bookID}.", color_success))
+            time.sleep(0.5)
+            rbar.update(1)
+        yield
+        
+        if name_cover is not None:
+            add_minio(name_cover)
+        else:
+            print(colored("\nError al descargar cover.", color_error))
+        
+
+def exist_databook(book_data, cursor):
+    try:
+        select_book = "SELECT * FROM books WHERE isbn = %s"
+        data_isbn = (book_data["isbn"],)
+        cursor.execute(select_book, data_isbn)
+        result = cursor.fetchone()
+        if result:
+            return result[0]
+        else:
+            return None
+    except mysql_connection.MySQLConnectionError as e:
+        print("\n", colored("Error de integridad:", "red"), e.msg)
+
+def insert_databook(book_data, cursor):
+    try:
+        add_book = ("INSERT INTO books "
+                            "(title, author, editorial, isbn, type, language) "
+                            "VALUES (%s, %s, %s, %s, %s, %s)")
+        data_book = (book_data["title"], book_data["author"], book_data["editorial"], book_data["isbn"], book_data["type"], book_data["language"])
+        cursor.execute(add_book, data_book)
+    except mysql_connection.MySQLConnectionError as e:
+        print("\n", colored("Error de integridad:", "red"), e.msg)
+    return True
 
 def add_book_bd(data, driver):
-    time.sleep(2)
-    link_book = data['view']
-    title = capitalizar_palabras(data['title'])
-    author = capitalizar_palabras(data['author'])
-    driver.get(link_book)
-    
-    data_category = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, './/*[@id="breadcrumbs"]/div/div[2]/div[5]/a/span')))
-    category = capitalizar_palabras(data_category.text)
-    
-    xpaths = ['//*[@id="app"]/div[1]/main/div/div/div/div[4]/div/div[3]',
-            '//*[@id="app"]/div[1]/main/div/div/div/div[6]/div/div[3]',
-            '//*[@id="app"]/div[1]/main/div/div/div/div[7]/div/div[3]']
-
-    # lista para almacenar los resultados
-    resultados = []
-
-    # comenzar el bucle de búsqueda de datos
-    with tqdm(total=100, desc="\033[33m\nAnalizando datos....\033[0m") as pbar:
-        # buscar los datos en cada xpath que aún no se haya comprobado
-        for xpath in xpaths:
+    print("\n\033[33mAnalizando datos....\033[0m")
+    with tqdm(total=5) as abar:
+        link_book = data['view']
+        title = capitalizar_palabras(data['title'])
+        author = capitalizar_palabras(data['author'])
+        abar.update(1)
+        driver.get(link_book)
+        abar.update(1)
+        category = ''
+        data_cover = ''
+        url_cover = ''
+        try:
+            data_category = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, './/*[@id="breadcrumbs"]/div/div[2]/div[5]/a/span')))
+            category = capitalizar_palabras(data_category.text)
+        except TimeoutException:
+                category = ''
+        try:
+            data_cover = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, './/*[@id="app"]/div[1]/main/div/div/div/div[3]/div/div[1]/div[1]/div/div/div/img')))
+        except TimeoutException:
+            try:
+                data_cover = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, './/*[@id="app"]/div[1]/main/div/div/div/div[3]/div/div[1]/div[2]/div/div/div/img')))
+            except TimeoutException:
+                data_cover = ''
+        if data_cover:
+            url_cover = data_cover.get_attribute("srcset").split(",")[-1].split(" ")[0]
+        abar.update(1)
+        xpath_list = ['//*[@id="app"]/div[1]/main/div/div/div/div[7]/div/div[3]', 
+                    '//*[@id="app"]/div[1]/main/div/div/div/div[6]/div/div[3]', 
+                    '//*[@id="app"]/div[1]/main/div/div/div/div[4]/div/div[3]']
+        data_sheet = None
+        for xpath in xpath_list:
             try:
                 data_sheet = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, xpath)))
-                if data_sheet is not None:
-                    rows = data_sheet.find_elements(By.XPATH, './/div[@class="row text-body-2 no-gutters"]')
-
-                    # crear un diccionario vacío para almacenar los datos de la ficha técnica
-                    tech_specs = {}
-                     # iterar sobre cada fila de la tabla y extraer el nombre y valor correspondientes
-                    for row in rows:
-                        name = row.find_element(By.XPATH, './/span/strong').text
-                        value = row.find_element(By.XPATH, './/div[@class="col col-6"][2]/span')
-                        tech_specs[name] = value.text
-
-                    isbn = ''
-                    idioma = ''
-                    editorial = ''
-
-                    try:
-                        isbn = tech_specs['ISBN:']
-                    except KeyError:
-                        isbn = ""
-
-                    try:
-                        idioma = tech_specs['Idioma:']
-                    except KeyError:
-                        idioma = ""
-
-                    try:
-                        editorial = tech_specs['Editorial:']
-                    except KeyError:
-                        editorial = ""
-                    
-                    # imprimir los datos de la ficha técnica
-                    if isbn not in [r.get('isbn', '') for r in resultados]:
-                        print("RR => ", isbn)
-                        resultados.append({'isbn': isbn, 'language': capitalizar_palabras(idioma), 'editorial': capitalizar_palabras(editorial), 'title': title, 'author': author, 'category': category})
-                    
-                    pbar.update(100)
-                    break
+                abar.update(1)
+                break
             except TimeoutException:
                 pass
-    if data_sheet is None:
-        print("No se pudo encontrar la hoja técnica")
-    else:    
-        if len(resultados) == 0:
-            print("No se encontraron resultados")
+            
+        resultados = []
+        if data_sheet is not None:
+            rows = data_sheet.find_elements(By.XPATH, './/div[@class="row text-body-2 no-gutters"]')
+            tech_specs = {}
+            for row in rows:
+                name = row.find_element(By.XPATH, './/span/strong').text
+                value = row.find_element(By.XPATH, './/div[@class="col col-6"][2]/span')
+                tech_specs[name] = value.text
+            isbn = tech_specs.get('ISBN:', '')
+            idioma = tech_specs.get('Idioma:', '')
+            editorial = tech_specs.get('Editorial:', '')
+            resultados.append({'isbn': isbn, 'language': capitalizar_palabras(idioma), 'editorial': capitalizar_palabras(editorial), 'title': title, 'author': author, 'category': category, 'cover': url_cover})
+            abar.update(1)
+            if not resultados:
+                print(colored('No se encontraron resultados.', color_error))
+                abar.close()
+            else:
+                abar.close()
+                loop([data_operation(resultados), delete_redis()])
         else:
-            print("Antes de la BD => ", resultados)
-            conection_database(resultados)
-
+            print(colored('No se pudo encontrar la hoja técnica.', color_error))
+            abar.close()
+            
 def select_book(data, df, driver):
     total_elements = len(df)
     print("\n------------------------------------------------------------------------------------------------------------------------")
@@ -247,14 +467,14 @@ def select_book(data, df, driver):
 
 def scraping(element, driver):
     articles = []
-    with tqdm(total=3) as pbar:
+    with tqdm(total=3) as sbar:
         try:
             driver.get('https://www.casadellibro.com/')
             try:
                 cookies_button = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button#onetrust-accept-btn-handler')))
                 try:
                     cookies_button.click()
-                    pbar.update(1)
+                    sbar.update(1)
                 except NoSuchElementException:
                     pass
             except TimeoutException:
@@ -265,8 +485,9 @@ def scraping(element, driver):
                 input_element.click()
                 driver.implicitly_wait(5)
                 boton_element = driver.find_element(By.XPATH, '//*[@id="app"]/div[1]/div[1]/div[3]/div[1]/div[1]/button')
+                driver.implicitly_wait(5)
                 boton_element.click()
-                pbar.update(1)
+                sbar.update(1)
             except TimeoutException:
                 print(colored('El elemento no está disponible para interactuar.', color_error))
                 pass
@@ -285,16 +506,15 @@ def scraping(element, driver):
                         element = WebDriverWait(driver, 5).until(EC.element_to_be_clickable((By.CSS_SELECTOR,'div.ebx-sliding-panel__scroll')))
                     except TimeoutException:
                         element = None
-                time.sleep(3)
                 if element:
                     articles = element.find_elements(By.TAG_NAME, "article")
-                    pbar.update(1)
+                    sbar.update(1)
                 else:
                     articles = []
             except TimeoutException:
                 print(colored('El elemento no está disponible para interactuar.', color_warning))
         except:
-            pbar.close()
+            sbar.close()
             raise
     list_articles_data = []
     id = 0
@@ -337,7 +557,7 @@ def scraping(element, driver):
                 dict_articles_data.setdefault(k, []).append(v)
         df = pd.DataFrame.from_dict(dict_articles_data)
         print("\n\033[33mCargando datos....\033[0m")
-        for i in trange(10, unit="s", unit_scale=0.1, unit_divisor=1):
+        for i in trange(5, unit="s", unit_scale=0.1, unit_divisor=1):
             time.sleep(0.2)
         select_book(list_articles_data, df, driver)
     else :
