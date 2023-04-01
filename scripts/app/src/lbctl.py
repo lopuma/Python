@@ -148,13 +148,12 @@ def add_minio(name_cover):
         if not found:
             client.make_bucket(bucket)
         else:
-            print("\n")
-            print(f"Bucket {bucket} already exists")
+            pass
         client.fput_object(
             bucket, filename, os.path.join(".", "covers", filename),
         )
         print("\n")
-        print(colored("Cover Data upload MINIO =>.", color_success), filename)
+        print(colored("Cover data upload MINIO.", color_success), filename)
     except S3Error as exc:
         print("\nerror occurred.", exc)
 
@@ -164,8 +163,8 @@ def delete_redis():
         exist_book = r.exists('books')
         if exist_book:
             r.delete('books')
-        print("\n")
-        print(colored(f"Eliminados datos en redis.", color_success))
+        # print("\n")
+        # print(colored(f"Eliminados datos en redis.", color_success))
         yield
     except:
         pass
@@ -230,7 +229,7 @@ def connect_database():
         pass
     return (cursor, cnx)
 
-def loop(tareas):
+def loop(tareas, callback=None):
     while tareas:
         actual = tareas.pop(0)
         try:
@@ -238,7 +237,13 @@ def loop(tareas):
             tareas.append(actual)
         except StopIteration:
             pass
-      
+        if callback is not None:
+            callback()
+
+def callback():
+    print("\n")
+    print(colored("La función delete_redis se ha ejecutado", color_success))
+           
 def select_idBook(book_data, name_cover, cursor):
     try:
         select_book = "SELECT bookID FROM books WHERE isbn = %s"
@@ -288,7 +293,7 @@ def data_operation(resultados):
     data_book =  resultados
     print("\n")
     print("\033[33mRealizando operaciones en la Base de datos....\033[0m")
-    with tqdm(total=5) as rbar:
+    with tqdm(total=6) as rbar:
         # extraer los datos del libro
         book_data = extract_data(data_book)
         if book_data:
@@ -343,18 +348,20 @@ def data_operation(resultados):
         
         # delete book Info
         succes_delete_bookinfo = delete_bookinfo_redis(bookID)
-        if succes_delete_bookinfo:
-            print("\n")
-            print(colored(f"Eliminados datos en redis del book ID {bookID}.", color_success))
-            time.sleep(0.5)
-            rbar.update(1)
+        print("\n")
+        print(colored(f"Eliminados datos en redis.", color_success))
+        time.sleep(0.5)
+        rbar.update(1)
         yield
         
         if name_cover is not None:
             add_minio(name_cover)
+            time.sleep(0.5)
+            rbar.update(1)
         else:
             print(colored("\nError al descargar cover.", color_error))
-        
+            rbar.close()
+        rbar.close()
 
 def exist_databook(book_data, cursor):
     try:
@@ -384,7 +391,6 @@ def add_book_bd(data, driver):
     print("\n\033[33mAnalizando datos....\033[0m")
     with tqdm(total=5) as abar:
         link_book = data['view']
-        title = capitalizar_palabras(data['title'])
         author = capitalizar_palabras(data['author'])
         abar.update(1)
         driver.get(link_book)
@@ -392,6 +398,11 @@ def add_book_bd(data, driver):
         category = ''
         data_cover = ''
         url_cover = ''
+        try:
+            data_title = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, './/*[@id="app"]/div[1]/main/div/div/div/div[3]/div/div[2]/div/h1')))
+            title = capitalizar_palabras(data_title.text)
+        except TimeoutException:
+                title = ''
         try:
             data_category = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.XPATH, './/*[@id="breadcrumbs"]/div/div[2]/div[5]/a/span')))
             category = capitalizar_palabras(data_category.text)
@@ -437,7 +448,8 @@ def add_book_bd(data, driver):
                 abar.close()
             else:
                 abar.close()
-                loop([data_operation(resultados), delete_redis()])
+                tareas = [data_operation(resultados), delete_redis()]
+                loop(tareas)
         else:
             print(colored('No se pudo encontrar la hoja técnica.', color_error))
             abar.close()
